@@ -34,8 +34,15 @@ def _key(s: pd.Series) -> pd.Series:
     )
 
 
-def clean(df: pd.DataFrame, provinces: list[str] | None = DEFAULT_PROVINCES) -> pd.DataFrame:
-    """Filter, type and deduplicate. Returns a new frame sorted by publish time."""
+def clean(
+    df: pd.DataFrame,
+    provinces: list[str] | None = DEFAULT_PROVINCES,
+    drop_reposts: bool = True,
+) -> pd.DataFrame:
+    """Filter, type and deduplicate. Returns a new frame sorted by publish time.
+
+    ``drop_reposts=False`` keeps every post, for building listing histories.
+    """
     out = df.copy()
     if provinces:
         out = out[out["province_name"].isin(provinces)]
@@ -53,9 +60,14 @@ def clean(df: pd.DataFrame, provinces: list[str] | None = DEFAULT_PROVINCES) -> 
     ]
     out = out[keep]
 
+    out = out.sort_values("published_at", kind="stable")
+    if not drop_reposts:
+        out = out.reset_index(drop=True)
+        out["price_per_m2"] = out["price"] / out["area"]
+        return out
+
     # Keep the first appearance of each listing. Reposts would otherwise end up on both
     # sides of the time split and make the model look better than it is.
-    out = out.sort_values("published_at", kind="stable")
     out = out.assign(_t=_key(out["name"]), _d=_key(out["description"]))
     out = out.drop_duplicates(["_t", "price", "area"])
     out = out[(out["_d"].str.len() < 50) | ~out.duplicated(["_d", "price", "area"])]

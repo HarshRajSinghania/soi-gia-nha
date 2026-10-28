@@ -54,3 +54,9 @@ def test_reposts_keep_the_earliest():
     ]
     out = clean(pd.DataFrame(rows))
     assert out["published_at"].dt.strftime("%Y-%m").tolist() == ["2025-07", "2025-10"]
+
+
+def test_can_keep_reposts_for_the_history():
+    rows = [listing(published_at="2025-09-01"), listing(published_at="2025-07-01")]
+    out = clean(pd.DataFrame(rows), drop_reposts=False)
+    assert out["published_at"].dt.strftime("%Y-%m").tolist() == ["2025-07", "2025-09"]
