@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below, together with the TiniX AI dataset."
+title: "soi-gia-nha: explainable price checks for Vietnamese real estate listings"
+authors:
+  - alias: HongTin2104
+version: 0.1.0
+date-released: 2026-10-28
+license: MIT
+repository-code: "https://github.com/HongTin2104/soi-gia-nha"
+references:
+  - type: dataset
+    title: "Tinix Vietnam Real Estate Listings (2025-2026)"
+    authors:
+      - name: TiniX AI
+    url: "https://huggingface.co/datasets/tinixai/vietnam-real-estates"
+    license: CC-BY-NC-4.0
