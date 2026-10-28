@@ -111,3 +111,24 @@ def test_match_finds_the_property():
     pasted = pd.Series(post("2026-10-01", 9e9))
     assert match(pasted, index) == index["property_id"].iloc[0]
     assert match(pd.Series(post("2026-10-01", 9e9, area=60.0)), index) is None
+
+
+def test_alternating_prices_are_flagged():
+    df = add_ids(
+        pd.DataFrame(
+            [
+                post("2025-07-01", 4.2e9),
+                post("2025-07-02", 5.7e9),
+                post("2025-07-03", 4.2e9),
+                post("2025-07-04", 5.7e9),
+            ]
+        )
+    )
+    s = summarize(df).iloc[0]
+    assert s["price_changes"] == 3
+    assert s["returns"] == 2
+
+
+def test_a_plain_price_cut_has_no_returns():
+    df = add_ids(pd.DataFrame([post("2025-07-01", 11e9), post("2025-09-01", 10e9)]))
+    assert summarize(df).iloc[0]["returns"] == 0

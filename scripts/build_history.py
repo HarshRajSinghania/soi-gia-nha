@@ -44,18 +44,35 @@ def agreement(df: pd.DataFrame, group: str, col: str, tol: float) -> tuple[float
     return float(((df.loc[m, col] - first[m]).abs() <= tol).mean()), int(m.sum())
 
 
+def write_samples(posts: pd.DataFrame, summary: pd.DataFrame, n: int = 2000) -> None:
+    """Latest post of properties with a story to tell (reposted, repriced, listed for a
+    while), full text included, for the app's "try a real listing" button."""
+    story = summary[
+        (summary["posts"] >= 3)
+        & (summary["price_changes"] >= 1)
+        & (summary["returns"] == 0)
+        & (summary["days_listed"] >= 30)
+    ]
+    picked = story.sample(min(n, len(story)), random_state=0).index
+    latest = posts[posts["property_id"].isin(picked)].groupby("property_id").tail(1)
+    latest.to_parquet(PROCESSED_DIR / "samples.parquet", index=False)
+
+
 def pct(x: float) -> str:
     return f"{x:.1%}"
 
 
 def main() -> None:
-    posts = add_ids(load_posts()).drop(columns=["description"])
-    posts["name"] = posts["name"].str.slice(0, 90)
+    posts = add_ids(load_posts())
     summary = summarize(posts)
+    write_samples(posts, summary)
+    posts = posts.drop(columns=["description"])
+    posts["name"] = posts["name"].str.slice(0, 90)
 
     multi = summary[summary["posts"] > 1]
     changed = summary[summary["price_changes"] > 0]
     long = summary[summary["days_listed"] >= 60]
+    returns = changed["returns"] > 0
     cuts = changed.loc[changed["change"] < 0, "change"]
     raises = changed.loc[changed["change"] > 0, "change"]
 
@@ -85,6 +102,8 @@ def main() -> None:
         f"| Median change when lowered | {pct(cuts.median())} |",
         f"| Median change when raised | {pct(raises.median())} |",
         f"| Listed for 60 days or more | {len(long):,} |",
+        f"| Price goes back to an earlier value (likely several units merged) | "
+        f"{returns.sum():,} ({pct(returns.mean())} of repriced) |",
         "",
         "## Is it really the same property?",
         "",

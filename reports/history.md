@@ -17,6 +17,7 @@ Two posts are the same property when district, ward, type and exact area match, 
 | Median change when lowered | -2.8% |
 | Median change when raised | 4.2% |
 | Listed for 60 days or more | 69,665 |
+| Price goes back to an earlier value (likely several units merged) | 4,815 (6.5% of repriced) |
 
 ## Is it really the same property?
 

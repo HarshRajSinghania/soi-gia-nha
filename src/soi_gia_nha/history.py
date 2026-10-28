@@ -103,19 +103,29 @@ def summarize(df: pd.DataFrame) -> pd.DataFrame:
         min_price=("price", "min"),
         max_price=("price", "max"),
     )
-    changed = d["price"].ne(g["price"].shift()) & g["price"].shift().notna()
+    prev = g["price"].shift()
+    changed = d["price"].ne(prev) & prev.notna()
     out["price_changes"] = changed.groupby(d["property_id"]).sum()
+    # A real property rarely goes back to a price it already left. Prices that alternate
+    # (4.2, 5.7, 4.2, 5.7) are usually several units of one project posted from the same
+    # template, merged here because they share ward and area.
+    steps = d[d["price"].ne(prev)]
+    out["returns"] = steps.duplicated(["property_id", "price"]).groupby(steps["property_id"]).sum()
     out["days_listed"] = (out["last_seen"] - out["first_seen"]).dt.days
     out["change"] = out["last_price"] / out["first_price"] - 1
     return out
 
 
 def match(listing: pd.Series, index: pd.DataFrame) -> int | None:
-    """Property id of a listing in ``index`` (posts with BLOCK columns and both hashes)."""
+    """Property id of a listing in ``index`` (posts with BLOCK columns and both hashes).
+
+    The index may store the hashes truncated to 32 bits, as the app data does."""
     desc = text_hash(pd.Series([listing.get("description")])).iloc[0]
     title = text_hash(pd.Series([listing.get("name")])).iloc[0]
     if not desc and not title:
         return None
+    if index["desc_hash"].dtype == np.uint32:
+        desc, title = desc & 0xFFFFFFFF, title & 0xFFFFFFFF
     same = (
         index["district_name"].eq(listing["district_name"])
         & index["property_type_name"].eq(listing["property_type_name"])
