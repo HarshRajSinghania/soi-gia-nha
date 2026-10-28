@@ -128,7 +128,9 @@ from soi_gia_nha.model import PriceModel
 model = PriceModel.load(ensure_model())
 listing = build(
     "Bán nhà 4 tầng hẻm xe hơi 60m2 giá 8,5 tỷ",
-    province="Hồ Chí Minh", district="Gò Vấp", property_type="Nhà",
+    province="Hồ Chí Minh",
+    district="Gò Vấp",
+    property_type="Nhà",
 )
 print(summary_vi(check(model, listing)))
 ```
