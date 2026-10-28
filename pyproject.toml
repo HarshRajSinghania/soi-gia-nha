@@ -15,7 +15,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.6"]
+app = ["streamlit>=1.40", "plotly>=5.20"]
+dev = ["pytest>=8", "ruff>=0.6", "streamlit>=1.40", "plotly>=5.20"]
 
 [build-system]
 requires = ["setuptools>=69"]
