@@ -1,0 +1,14 @@
+[theme]
+base = "light"
+primaryColor = "#1d2327"
+backgroundColor = "#faf8f4"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#1d2327"
+font = "Be Vietnam Pro:https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap"
+baseFontSize = 15
+
+[client]
+toolbarMode = "minimal"
+
+[browser]
+gatherUsageStats = false
