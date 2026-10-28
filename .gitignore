@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+*.sqlite
+.cache*
+data/raw/
+data/processed/*.parquet
+models/
+*.pkl
+.DS_Store
