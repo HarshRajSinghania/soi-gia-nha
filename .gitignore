@@ -12,3 +12,4 @@ data/processed/*.parquet
 models/
 *.pkl
 .DS_Store
+*.egg-info/
