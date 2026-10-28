@@ -69,6 +69,16 @@ div[data-baseweb="select"] > div {
 .stButton button[kind="primary"]:hover {
   background: #33404a;
 }
+.stButton button[kind="secondary"] {
+  background: transparent;
+  border: 1px dashed #b9b2a4;
+  border-radius: 8px;
+  color: var(--ink);
+}
+.stButton button[kind="secondary"]:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
 
 /* result card */
 .sg-card {
@@ -160,11 +170,13 @@ div[data-baseweb="select"] > div {
   font-weight: 600;
 }
 
-/* reasons */
-.sg-section {
-  margin-top: 1.6rem;
+/* sections under the price card */
+.sg-block {
+  margin-top: 1.4rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--line);
 }
-.sg-section h4 {
+.sg-block h4 {
   font-size: 1rem;
   font-weight: 600;
   color: var(--ink);
@@ -223,6 +235,172 @@ div[data-baseweb="select"] > div {
 .sg-val.sg-up { color: var(--expensive); }
 .sg-val.sg-down { color: var(--cheap); }
 
+/* listing history */
+.sg-block.sg-history {
+  background: #f3f0e9;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1.2rem 1.4rem 1.1rem;
+}
+.sg-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 2rem;
+  margin: 0.2rem 0 0.8rem;
+}
+.sg-facts span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.sg-facts b {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.stApp .sg-story {
+  margin: 0 0 0.6rem;
+  color: var(--ink);
+}
+.stApp .sg-story.sg-caution {
+  color: #6e5520;
+}
+.stApp .sg-story.sg-muted {
+  color: var(--muted);
+}
+.sg-steps {
+  width: 100%;
+  height: 64px;
+  display: block;
+  margin: 0.3rem 0 0.4rem;
+}
+.sg-steps polyline {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.sg-steps circle {
+  fill: var(--ink);
+}
+.sg-steplist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.85rem;
+  max-height: 11rem;
+  overflow-y: auto;
+}
+.sg-steplist li,
+.sg-comps li {
+  margin: 0;
+}
+.sg-steplist li {
+  display: grid;
+  grid-template-columns: 6.5rem 5.5rem 1fr;
+  gap: 0.6rem;
+  padding: 0.25rem 0;
+  border-bottom: 1px dashed #e2ddd2;
+}
+.sg-steplist span,
+.sg-steplist em {
+  color: var(--muted);
+  font-style: normal;
+}
+.sg-steplist b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ward trend */
+.sg-spark {
+  width: 100%;
+  height: 80px;
+  display: block;
+}
+.sg-spark polygon {
+  fill: #e7ece9;
+}
+.sg-spark polyline {
+  fill: none;
+  stroke: #5f7a6d;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.sg-spark .sg-you {
+  stroke: var(--expensive);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+  vector-effect: non-scaling-stroke;
+}
+.sg-axisline {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 0.75rem;
+  margin-top: 0.2rem;
+}
+.stApp .sg-key {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 0.5rem 0 0;
+}
+.sg-key i {
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  vertical-align: middle;
+  margin: 0 0.4rem 0 0;
+}
+.sg-key-line {
+  border-top: 2px solid #5f7a6d;
+}
+.sg-key-you {
+  border-top: 2px dashed var(--expensive);
+  margin-left: 1.2rem !important;
+}
+
+/* similar properties */
+.sg-comps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sg-comps li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid #efece6;
+  font-size: 0.9rem;
+}
+.sg-comp-main b {
+  display: inline-block;
+  min-width: 5.5rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.sg-comp-main span {
+  color: var(--muted);
+}
+.sg-comp-side {
+  text-align: right;
+  white-space: nowrap;
+}
+.sg-comp-side span {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.sg-comp-side span.sg-up { color: var(--expensive); }
+.sg-comp-side span.sg-down { color: var(--cheap); }
+.sg-comp-side em {
+  display: block;
+  font-style: normal;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
 /* notes */
 .sg-warn,
 .sg-addr {
@@ -251,6 +429,7 @@ div[data-baseweb="select"] > div {
   color: var(--muted);
 }
 .stApp .sg-empty p {
+  line-height: 1.5;
   color: var(--ink);
   font-weight: 500;
   margin-bottom: 0.5rem;
@@ -276,6 +455,9 @@ div[data-baseweb="select"] > div {
 @media (max-width: 640px) {
   .sg-reason {
     grid-template-columns: 8rem 1fr 3rem;
+  }
+  .sg-steplist li {
+    grid-template-columns: 5.5rem 5rem 1fr;
   }
   .sg-asked {
     font-size: 2rem;

@@ -1,20 +1,24 @@
-"""Streamlit demo: paste a listing, get a verdict and the reasons behind it.
+"""Streamlit demo: paste a listing, get a verdict, its posting history and the market around it.
 
 streamlit run app/app.py
 """
 
 from __future__ import annotations
 
+import hashlib
 from html import escape
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
+from soi_gia_nha import ui
 from soi_gia_nha.admin import attach_new_units, build_map
-from soi_gia_nha.assets import ensure_model
-from soi_gia_nha.explain import Check, check, format_vnd
+from soi_gia_nha.assets import ensure_data, ensure_model
+from soi_gia_nha.explain import check
+from soi_gia_nha.history import BLOCK, match, price_steps
 from soi_gia_nha.listing import build, parse_area, parse_price
+from soi_gia_nha.market import pulse_for, similar
 from soi_gia_nha.model import PriceModel
 from soi_gia_nha.text import extract, prepare_text
 
@@ -24,11 +28,6 @@ EXAMPLE = (
 )
 NO_WARD = "Không rõ"
 NO_PROJECT = "Không thuộc dự án"
-VERDICT_TEXT = {
-    "cheap": "Rẻ hơn mặt bằng",
-    "fair": "Giá hợp lý",
-    "expensive": "Đắt hơn mặt bằng",
-}
 
 st.set_page_config(page_title="Soi giá nhà", layout="wide")
 st.markdown(
@@ -40,6 +39,26 @@ st.markdown(
 @st.cache_resource(show_spinner="Đang tải mô hình, lần đầu mất khoảng một phút...")
 def load_model() -> PriceModel:
     return PriceModel.load(ensure_model())
+
+
+@st.cache_resource(show_spinner="Đang tải dữ liệu 1,4 triệu căn...")
+def load_market():
+    """Property tables for the history and market sections. ``None`` if unavailable: the
+    price check still works without them."""
+    try:
+        d = ensure_data()
+    except OSError:
+        return None
+    props = pd.read_parquet(d / "properties.parquet")
+    posts = pd.read_parquet(d / "posts.parquet")
+    index = posts.join(props[BLOCK], on="property_id")
+    return {
+        "props": props,
+        "posts": posts,
+        "index": index,
+        "pulse": pd.read_parquet(d / "pulse.parquet"),
+        "samples": pd.read_parquet(d / "samples.parquet"),
+    }
 
 
 @st.cache_resource(show_spinner=False)
@@ -70,63 +89,40 @@ def district_label(d: str) -> str:
     return f"Quận {d}" if d.isdigit() else d
 
 
-def _pos(value: float, lo: float, hi: float) -> float:
-    return max(0.0, min(100.0, (value - lo) / (hi - lo) * 100))
+def split_listing(text: str) -> tuple[str, str]:
+    """Title and body of a pasted listing: the first line is usually the title."""
+    lines = [ln.strip() for ln in text.strip().splitlines() if ln.strip()]
+    if len(lines) > 1:
+        return lines[0], " ".join(lines[1:])
+    return text, text
 
 
-def price_card(result: Check, area: float) -> str:
-    lo = min(result.low, result.asked) * 0.92
-    hi = max(result.high, result.asked) * 1.08
-    left, right = _pos(result.low, lo, hi), _pos(result.high, lo, hi)
-    side = "cao" if result.diff > 0 else "thấp"
-    note = f"{side.capitalize()} hơn mức giữa {abs(result.diff):.0%}."
-    if result.verdict == "fair":
-        note = f"Nằm trong khoảng hợp lý, {side} hơn mức giữa {abs(result.diff):.0%}."
-    span = f"{format_vnd(result.low)} – {format_vnd(result.high)}"
-    return f"""
-<div class="sg-card">
-  <div class="sg-verdict sg-{result.verdict}">{VERDICT_TEXT[result.verdict]}</div>
-  <div class="sg-asked">{format_vnd(result.asked)}
-    <span>giá rao · {result.asked / area / 1e6:,.0f} triệu/m²</span></div>
-  <p class="sg-note">{note}</p>
-  <div class="sg-track">
-    <div class="sg-range" style="left:{left:.1f}%;width:{right - left:.1f}%"></div>
-    <div class="sg-mid" style="left:{_pos(result.mid, lo, hi):.1f}%"></div>
-    <div class="sg-pin sg-{result.verdict}" style="left:{_pos(result.asked, lo, hi):.1f}%"></div>
-  </div>
-  <div class="sg-legend">
-    <div><span>Khoảng giá hợp lý</span><b>{span}</b></div>
-    <div><span>Mức giữa</span><b>{format_vnd(result.mid)}</b></div>
-  </div>
-</div>"""
+def text_tag(text: str) -> str:
+    return hashlib.md5(text.encode()).hexdigest()[:8]
 
 
-def reasons_block(result: Check) -> str:
-    if not result.reasons:
-        return ""
-    top = max(abs(r.effect) for r in result.reasons)
-    rows = []
-    for r in result.reasons:
-        width = abs(r.effect) / top * 50
-        side = "up" if r.effect > 0 else "down"
-        rows.append(
-            f'<div class="sg-reason"><span class="sg-label">{escape(r.label)}</span>'
-            f'<span class="sg-axis"><i class="sg-{side}" style="width:{width:.1f}%"></i></span>'
-            f'<span class="sg-val sg-{side}">{r.effect:+.0%}</span></div>'
-        )
-    return (
-        '<div class="sg-section"><h4>Vì sao ra mức giá này</h4>'
-        '<p class="sg-hint">So với giá/m² của một tin trung bình trong dữ liệu.</p>'
-        + "".join(rows)
-        + "</div>"
+def default(key: str, value) -> dict:
+    """Widget arguments: the parsed value, unless the sample button already set one."""
+    return {"key": key} if key in st.session_state else {"key": key, "value": value}
+
+
+def load_sample() -> None:
+    market = load_market()
+    s = market["samples"].sample(1).iloc[0]
+    text = f"{s['name']}\n\n{s['description']}"
+    # Use the seller's own price and area: reading them back from the text is less exact.
+    tag = text_tag(text)
+    st.session_state[f"price_{tag}"] = round(s["price"] / 1e9, 3)
+    st.session_state[f"area_{tag}"] = float(s["area"])
+    st.session_state.update(
+        text=text,
+        province=s["province_name"],
+        ptype=s["property_type_name"],
+        district=s["district_name"],
+        ward=s["ward_name"] if isinstance(s["ward_name"], str) else NO_WARD,
+        project=NO_PROJECT,
+        run=True,
     )
-
-
-def notes_block(result: Check, new_address: str | None) -> str:
-    items = [f'<div class="sg-warn">{escape(w)}</div>' for w in result.warnings]
-    if new_address:
-        items.append(f'<div class="sg-addr"><span>Địa chỉ sau 1/7/2025</span>{new_address}</div>')
-    return "".join(items)
 
 
 def new_address_for(row: pd.DataFrame, ward: str | None) -> str | None:
@@ -140,68 +136,99 @@ def new_address_for(row: pd.DataFrame, ward: str | None) -> str | None:
     return f"<b>{wards}</b>, {escape(new['new_province'])}"
 
 
-def empty_state() -> str:
-    return """
-<div class="sg-card sg-empty">
-  <p>Kết quả sẽ hiện ở đây.</p>
-  <ul>
-    <li>Khoảng giá hợp lý cho căn này</li>
-    <li>Giá rao đang cao hay thấp hơn bao nhiêu</li>
-    <li>Những yếu tố đẩy giá lên, kéo giá xuống</li>
-    <li>Tên phường mới sau sắp xếp hành chính</li>
-  </ul>
-</div>"""
+def market_sections(market, listing: pd.Series, asked: float) -> str:
+    props, pulse = market["props"], market["pulse"]
+    ppm = asked / listing["area"]
+    html = []
+    pid = match(listing, market["index"])
+    if pid is None:
+        html.append(ui.history_missing())
+    else:
+        steps = price_steps(market["posts"][market["posts"]["property_id"] == pid])
+        html.append(ui.history_card(props.loc[pid], steps))
+    p = pulse_for(
+        pulse, listing["district_name"], listing.get("ward_name"), listing["property_type_name"]
+    )
+    if p is not None:
+        html.append(ui.pulse_card(p, ppm))
+    html.append(ui.comps_card(similar(listing, props, exclude=pid), ppm))
+    return "".join(html)
+
+
+def keep_valid(key: str, options: list[str], default: str) -> None:
+    """Session values set by the sample button may not exist in the current option list."""
+    if st.session_state.get(key) not in options:
+        st.session_state[key] = default if default in options else options[0]
 
 
 def main() -> None:
     st.markdown(
         '<header class="sg-top"><div class="sg-brand">Soi giá nhà</div>'
-        '<div class="sg-tag">Tin này đắt hay rẻ? So với 1,5 triệu tin rao bán ở Hà Nội và '
-        "TP.HCM, kèm lý do.</div></header>",
+        '<div class="sg-tag">Tin này đắt hay rẻ, đã rao bao lâu, giá đổi mấy lần? '
+        "Tra trên 2,2 triệu tin rao bán ở Hà Nội và TP.HCM.</div></header>",
         unsafe_allow_html=True,
     )
 
     model = load_model()
+    market = load_market()
     wards = wards_by_district(model)
+    st.session_state.setdefault("text", EXAMPLE)
     left, right = st.columns([5, 6], gap="large")
 
     with left:
-        text = st.text_area("Nội dung tin đăng", value=EXAMPLE, height=150)
+        if market is not None:
+            st.button("Lấy một tin có thật để thử", on_click=load_sample, width="stretch")
+        text = st.text_area("Nội dung tin đăng", key="text", height=170)
         feats = extract(prepare_text(pd.Series([""]), pd.Series([text]))).iloc[0]
 
         c1, c2 = st.columns(2)
-        province = c1.selectbox("Thành phố", ["Hà Nội", "Hồ Chí Minh"])
+        keep_valid("province", ["Hà Nội", "Hồ Chí Minh"], "Hà Nội")
+        province = c1.selectbox("Thành phố", ["Hà Nội", "Hồ Chí Minh"], key="province")
         types = model.categories["property_type_name"]
-        property_type = c2.selectbox("Loại", types, index=types.index("Nhà"))
+        keep_valid("ptype", types, "Nhà")
+        property_type = c2.selectbox("Loại", types, key="ptype")
         districts = districts_for(province, model)
-        default_d = districts.index("Cầu Giấy") if "Cầu Giấy" in districts else 0
+        keep_valid("district", districts, "Cầu Giấy")
         district = c1.selectbox(
-            "Quận, huyện", districts, index=default_d, format_func=district_label
+            "Quận, huyện", districts, key="district", format_func=district_label
         )
-        ward = c2.selectbox("Phường, xã", [NO_WARD] + wards.get((property_type, district), []))
+        ward_options = [NO_WARD] + wards.get((property_type, district), [])
+        keep_valid("ward", ward_options, NO_WARD)
+        ward = c2.selectbox("Phường, xã", ward_options, key="ward")
         ward = None if ward == NO_WARD else ward
         project = None
         if property_type == "Căn hộ chung cư":
-            project = st.selectbox("Dự án", [NO_PROJECT] + model.categories["project_name"])
+            projects = [NO_PROJECT] + model.categories["project_name"]
+            keep_valid("project", projects, NO_PROJECT)
+            project = st.selectbox("Dự án", projects, key="project")
             project = None if project == NO_PROJECT else project
         st.caption("Dùng tên quận, phường cũ như trong tin đăng (trước 1/7/2025).")
 
+        # Keyed by the text so the parsed values refresh when a new listing is pasted.
+        tag = text_tag(text)
         c1, c2, c3 = st.columns([4, 4, 3])
         price_bn = c1.number_input(
-            "Giá rao, tỷ", min_value=0.0, value=round((parse_price(text) or 0) / 1e9, 3), step=0.1
+            "Giá rao, tỷ",
+            min_value=0.0,
+            step=0.1,
+            **default(f"price_{tag}", round((parse_price(text) or 0) / 1e9, 3)),
         )
-        area = c2.number_input("Diện tích, m²", min_value=0.0, value=float(parse_area(text) or 0))
+        area = c2.number_input(
+            "Diện tích, m²", min_value=0.0, **default(f"area_{tag}", float(parse_area(text) or 0))
+        )
         floors = c3.number_input(
             "Số tầng",
             min_value=0,
             value=int(feats["txt_floors"]) if pd.notna(feats["txt_floors"]) else 0,
+            key=f"floors_{tag}",
         )
         st.caption("Ba ô trên được đọc tự động từ tin, sửa lại nếu chưa đúng.")
-        clicked = st.button("Soi giá", type="primary", width="stretch")
+        if st.button("Soi giá", type="primary", width="stretch"):
+            st.session_state["run"] = True
 
     with right:
-        if not clicked:
-            st.markdown(empty_state(), unsafe_allow_html=True)
+        if not st.session_state.get("run"):
+            st.markdown(ui.empty_state(), unsafe_allow_html=True)
         elif price_bn <= 0 or area <= 0:
             st.error("Tin chưa có giá hoặc diện tích. Điền vào hai ô bên trái rồi thử lại.")
         else:
@@ -217,17 +244,20 @@ def main() -> None:
                 floor_count=floors or None,
             )
             result = check(model, row)
-            st.markdown(
-                price_card(result, area)
-                + reasons_block(result)
-                + notes_block(result, new_address_for(row, ward)),
-                unsafe_allow_html=True,
-            )
+            html = ui.price_card(result, area)
+            if market is not None:
+                title, body = split_listing(text)
+                listing = row.iloc[0].copy()
+                listing["name"], listing["description"] = title, body
+                html += market_sections(market, listing, result.asked)
+            html += ui.reasons_block(result) + ui.notes_block(result, new_address_for(row, ward))
+            st.markdown(html, unsafe_allow_html=True)
 
     st.markdown(
         '<footer class="sg-foot">So với <b>giá rao</b> của các tin đăng từ 6/2025 đến 3/2026, '
         "không phải giá giao dịch và không thay cho thẩm định. Sai số trung vị khoảng 12% "
-        "(căn hộ khoảng 7%). Dữ liệu: "
+        "(căn hộ khoảng 7%). Một căn được coi là đăng lại khi trùng phường, loại, diện tích và "
+        "nội dung hoặc tiêu đề. Dữ liệu: "
         '<a href="https://huggingface.co/datasets/tinixai/vietnam-real-estates">TiniX AI</a>, '
         "CC BY-NC 4.0 · "
         '<a href="https://github.com/HongTin2104/soi-gia-nha">Mã nguồn</a></footer>',
