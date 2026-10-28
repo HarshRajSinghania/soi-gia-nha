@@ -2,26 +2,37 @@
 
 [![CI](https://github.com/HongTin2104/soi-gia-nha/actions/workflows/ci.yml/badge.svg)](https://github.com/HongTin2104/soi-gia-nha/actions/workflows/ci.yml)
 
-**Is this listing overpriced?** Paste a house or apartment listing from Hanoi or Ho Chi Minh
-City and get a fair price range, a verdict, and the reasons behind it. Trained on 1.5 million
+**Is this listing overpriced, and how long has it been on the market?** Paste a house or
+apartment listing from Hanoi or Ho Chi Minh City. You get a fair price range with the reasons
+behind it, the listing's own history (first posted when, reposted how often, price cut or
+raised), the price trend in its ward, and the closest similar properties. Built on 2.2 million
 real listings from June 2025 to March 2026.
 
-<p align="center"><img src="docs/demo.png" width="860" alt="Demo: a Cầu Giấy house listed at 9.5 billion VND is flagged as cheaper than the area, with location as the main reason"></p>
+<p align="center"><img src="docs/demo.png" width="860" alt="Demo: a Thủ Đức house listed at 10 billion VND has been on the market for 9 months and was cut 9%; the ward trend and five similar houses are shown below the verdict"></p>
 
 ## Why
 
-Someone looking at *"Bán nhà 5 tầng Cầu Giấy, 45m², 9,5 tỷ"* has no quick way to tell whether
-that is a good price. The usual answer is to scroll through hundreds of similar listings.
-Listing sites show a price, sometimes a price per m², never *why* a place costs what it costs.
+Someone looking at *"Bán nhà 4 tầng Linh Chiểu, 86m², 10 tỷ"* has no quick way to tell whether
+that is a good price. Listing sites show a price, sometimes a price per m², never *why* a place
+costs what it costs, and never **how long it has been for sale**.
 
-On top of that, Vietnam merged its provinces and wards on 1 July 2025. Listings still use the
-old ward names, while maps and documents now use the new ones.
+That last part is hidden on purpose. Agents repost the same property again and again so it
+shows up as new. In this data:
 
-This project answers three questions for a single listing:
+- **35% of all posts repeat a property that was already listed**, one of them 125 times;
+- **74,497 properties changed their asking price** between posts, and 45% of those went *up*;
+- **69,665 properties stayed on the market for two months or more.**
 
-1. **What is a fair asking price here?** A range, not one number.
-2. **Why?** Which details push the price up or down, in percent.
-3. **Where is it now?** The ward after the 2025 reorganisation.
+A buyer who knows a house has sat unsold for nine months and was already cut 9% is in a very
+different position from one who thinks it was posted yesterday.
+
+For a single listing, this project answers:
+
+1. **What is a fair asking price here?** A range, not one number, with the reasons.
+2. **Has it been listed before?** First seen when, how many posts, every price change.
+3. **What is the ward doing?** Monthly price per m² over ten months.
+4. **What else is there?** The five closest properties, to check the model against.
+5. **Where is it now?** The ward after the 1 July 2025 reorganisation.
 
 ## Data
 
@@ -72,6 +83,27 @@ data until it covers 80% of asking prices there (conformalized quantile regressi
 (location, size, floors, car access, legal papers...). Each one reads as *"this makes the price
 per m² X% higher than an average listing in the data"*.
 
+**Listing history.** Two posts are the same property when district, ward, type and exact area
+match, and either the description or the title matches once numbers, punctuation and case are
+ignored. Dropping the numbers is what makes it work: a price cut usually edits the number and
+nothing else. Links are transitive, so a property whose title changed in one repost and
+description in another is still one property.
+
+There is no ground truth for "same property", so the check uses details sellers type into
+separate fields ([reports/history.md](reports/history.md)). A repost of the same property should
+repeat them; two different properties in the same ward with the same area usually do not:
+
+| Field | Linked reposts agree | Same ward and area, not linked |
+|---|---:|---:|
+| Floors | 99.1% | 43.2% |
+| Bedrooms | 98.5% | 55.4% |
+| Frontage | 96.7% | 35.5% |
+
+One known failure: agents describe several units of one project with the same text, and those
+get merged. Their prices then jump back and forth (4.2, 5.7, 4.2, 5.7 billion), which a single
+property almost never does. That happens for 6.5% of repriced properties; the app says so
+instead of showing a fake history.
+
 ## Results
 
 Trained on June 2025 to January 2026, tested on **March 2026** (160,891 listings the model never
@@ -108,9 +140,10 @@ pip install -e ".[app]"
 streamlit run app/app.py
 ```
 
-The trained model (~80 MB download) is fetched from the
-[model-v0.1 release](https://github.com/HongTin2104/soi-gia-nha/releases/tag/model-v0.1) on
-first start. With Docker:
+The trained model (~80 MB) and the property data for the history and market sections (~70 MB)
+are fetched from the [releases](https://github.com/HongTin2104/soi-gia-nha/releases) on first
+start. The **Lấy một tin có thật để thử** button fills the form with a real listing that has a
+price history. With Docker:
 
 ```sh
 docker build -t soi-gia-nha .
@@ -152,6 +185,8 @@ python scripts/prepare.py       # clean, read text, map wards -> data/processed/
 python scripts/eval_text.py     # reports/text_extraction.md
 python scripts/train.py         # models/v0.1/ and reports/model.md
 python scripts/eval_checks.py   # reports/checks.md
+python scripts/build_history.py # link reposts, reports/history.md
+python scripts/build_app_data.py  # data/app/ for the demo
 pytest
 ```
 
@@ -168,7 +203,10 @@ src/soi_gia_nha/
   model.py     LightGBM models, fair range, save/load
   explain.py   verdict, TreeSHAP reasons, Vietnamese summary
   listing.py   turn a pasted listing into a model row
-  assets.py    fetch the trained model from the release
+  history.py   link reposts of one property, price steps, match a pasted listing
+  market.py    monthly ward trends, similar properties
+  ui.py        HTML for the demo
+  assets.py    fetch the trained model and app data from the releases
 app/app.py     Streamlit demo
 scripts/       pipeline steps, each writes its own report
 reports/       numbers quoted in this README
@@ -184,6 +222,9 @@ reports/       numbers quoted in this README
 - Reasons are relative to an average listing in the data, not to the neighbouring houses.
 - 39% of listings sit in an old ward that was split; the app then shows every candidate new ward.
 - Text extraction is rule-based. It misses unusual phrasing and can misread numbers.
+- The history only covers June 2025 to March 2026. A listing pasted today has a history only if
+  the same property was listed in that period with a matching text.
+- Reposts with a rewritten title **and** a rewritten description are not linked.
 
 Ideas for later: other cities, rental listings, a learned extractor for the description text,
 alerts for new listings below the fair range.
@@ -200,6 +241,10 @@ ngôn ngữ tự nhiên. Một vài điểm nên xem:
 - **Khoảng dự đoán phải được kiểm tra.** Khoảng 10–90% của mô hình quantile ban đầu chỉ đúng
   70% trên tháng mới; hiệu chỉnh conformal đưa lên 77,5%.
 - **Giải thích bằng SHAP** không cần thư viện `shap`: LightGBM có sẵn `pred_contrib=True`.
+- **Kiểm tra một thứ không có nhãn.** Không có dữ liệu nào cho biết hai tin có phải cùng một
+  căn hay không. Cách làm ở `scripts/build_history.py`: so các trường người bán tự điền (số
+  tầng, phòng ngủ) giữa các tin được nối, và so với một nhóm đối chứng (cùng phường, cùng diện
+  tích nhưng không được nối). 99% so với 43% là bằng chứng đủ mạnh.
 - Mỗi con số trong README đều do một script trong `scripts/` sinh ra; chạy lại sẽ ra cùng kết quả.
 
 Nếu dùng lại code hoặc kết quả trong báo cáo, hãy trích dẫn repo này và bộ dữ liệu của TiniX AI.
