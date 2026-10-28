@@ -83,6 +83,7 @@ class PriceModel:
     ward_medians: pd.Series | None = None
     district_medians: pd.Series | None = None
     range_adjust: float = 0.0  # added to both ends of the range, in log price per m2
+    districts: dict[str, list[str]] = field(default_factory=dict)
 
     # -- features ---------------------------------------------------------------------
 
@@ -102,6 +103,9 @@ class PriceModel:
             (n * ward["median"].to_numpy() + WARD_SHRINK * district) / (n + WARD_SHRINK),
             index=ward.index,
         )
+        self.districts = {
+            p: sorted(g.unique()) for p, g in train.groupby("province_name")["district_name"]
+        }
         projects = train["project_name"].value_counts()
         keep_projects = set(projects[projects >= MIN_PROJECT_LISTINGS].index)
         for col in CATEGORICAL:
@@ -193,7 +197,11 @@ class PriceModel:
         path.mkdir(parents=True, exist_ok=True)
         for name, b in self.boosters.items():
             b.save_model(path / f"{name}.txt", num_iteration=b.best_iteration)
-        meta = {"categories": self.categories, "range_adjust": self.range_adjust}
+        meta = {
+            "categories": self.categories,
+            "range_adjust": self.range_adjust,
+            "districts": self.districts,
+        }
         (path / "meta.json").write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
         self.ward_medians.rename("v").reset_index().to_parquet(path / "ward_medians.parquet")
         self.district_medians.rename("v").reset_index().to_parquet(
@@ -207,6 +215,7 @@ class PriceModel:
             m.boosters[name] = lgb.Booster(model_file=str(path / f"{name}.txt"))
         meta = json.loads((path / "meta.json").read_text(encoding="utf-8"))
         m.categories, m.range_adjust = meta["categories"], meta["range_adjust"]
+        m.districts = meta["districts"]
         w = pd.read_parquet(path / "ward_medians.parquet")
         m.ward_medians = w.set_index(["property_type_name", "district_name", "ward_name"])["v"]
         d = pd.read_parquet(path / "district_medians.parquet")

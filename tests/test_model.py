@@ -42,3 +42,8 @@ def test_range_is_widened_on_validation(trained):
     pred = model.predict(test)
     inside = (pred["low"] <= test["price"]) & (test["price"] <= pred["high"])
     assert inside.mean() > 0.6
+
+
+def test_remembers_districts_per_province(trained):
+    model, _ = trained
+    assert model.districts == {"Hà Nội": ["Cầu Giấy", "Hà Đông"]}
