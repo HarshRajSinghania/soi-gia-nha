@@ -13,3 +13,5 @@ models/
 *.pkl
 .DS_Store
 *.egg-info/
+data/app/
+data/*.zip

@@ -30,3 +30,11 @@ def test_incomplete_archive_is_an_error(tmp_path):
     url = make_archive(tmp_path / "m.zip", REQUIRED[:2])
     with pytest.raises(RuntimeError, match="missing"):
         ensure_model(tmp_path / "model", url)
+
+
+def test_data_bundle_uses_the_same_mechanism(tmp_path):
+    from soi_gia_nha.assets import DATA_FILES, ensure_data
+
+    url = make_archive(tmp_path / "d.zip", DATA_FILES)
+    dest = ensure_data(tmp_path / "data", url)
+    assert all((dest / f).exists() for f in DATA_FILES)
