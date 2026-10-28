@@ -126,21 +126,19 @@ def match(listing: pd.Series, index: pd.DataFrame) -> int | None:
         return None
     if index["desc_hash"].dtype == np.uint32:
         desc, title = desc & 0xFFFFFFFF, title & 0xFFFFFFFF
-    same = (
-        index["district_name"].eq(listing["district_name"])
-        & index["property_type_name"].eq(listing["property_type_name"])
-        & np.isclose(index["area"], listing["area"])
+    district = index["district_name"].eq(listing["district_name"]) & index["property_type_name"].eq(
+        listing["property_type_name"]
     )
+    same = district & np.isclose(index["area"], listing["area"])
     ward = listing.get("ward_name")
     if isinstance(ward, str):
         same &= index["ward_name"].eq(ward)
-    hit = index[
-        same
-        & (
-            ((index["desc_hash"] == desc) & (desc != 0))
-            | ((index["title_hash"] == title) & (title != 0))
-        )
-    ]
+    by_desc = (index["desc_hash"] == desc) & (desc != 0)
+    hit = index[same & (by_desc | ((index["title_hash"] == title) & (title != 0)))]
+    if hit.empty:
+        # The area typed in a pasted listing often differs from the one the seller entered
+        # in the form. A full description match in the same district is specific enough.
+        hit = index[district & by_desc]
     if hit.empty:
         return None
     return int(hit["property_id"].mode().iloc[0])

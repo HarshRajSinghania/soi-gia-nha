@@ -110,7 +110,12 @@ def test_match_finds_the_property():
     index = add_ids(pd.DataFrame([post("2025-07-01", 11e9), post("2025-09-01", 10e9)]))
     pasted = pd.Series(post("2026-10-01", 9e9))
     assert match(pasted, index) == index["property_id"].iloc[0]
-    assert match(pd.Series(post("2026-10-01", 9e9, area=60.0)), index) is None
+    # different area: still found through the description
+    assert (
+        match(pd.Series(post("2026-10-01", 9e9, area=60.0)), index) == index["property_id"].iloc[0]
+    )
+    other = post("2026-10-01", 9e9, area=60.0, description="Một căn khác hẳn, mô tả không giống")
+    assert match(pd.Series(other), index) is None
 
 
 def test_alternating_prices_are_flagged():
