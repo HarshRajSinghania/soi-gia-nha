@@ -5,6 +5,7 @@ streamlit run app/app.py
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -89,11 +90,12 @@ def range_chart(result) -> go.Figure:
         )
     lo = min(result.low, result.asked) * 0.9
     hi = max(result.high, result.asked) * 1.1
+    ticks = np.linspace(lo, hi, 5)
     fig.update_layout(
-        height=170,
-        margin={"l": 10, "r": 10, "t": 40, "b": 10},
+        height=200,
+        margin={"l": 10, "r": 10, "t": 70, "b": 10},
         showlegend=False,
-        xaxis={"range": [lo, hi], "tickformat": ".3s", "title": "VND"},
+        xaxis={"range": [lo, hi], "tickvals": ticks, "ticktext": [format_vnd(t) for t in ticks]},
         yaxis={"visible": False},
     )
     return fig
@@ -101,9 +103,11 @@ def range_chart(result) -> go.Figure:
 
 def reasons_chart(result) -> go.Figure:
     reasons = list(reversed(result.reasons))
+    effects = [r.effect * 100 for r in reasons]
+    pad = 0.15 * (max(0, *effects) - min(0, *effects)) + 5
     fig = go.Figure(
         go.Bar(
-            x=[r.effect * 100 for r in reasons],
+            x=effects,
             y=[r.label for r in reasons],
             orientation="h",
             marker_color=["#cf222e" if r.effect > 0 else "#1a7f37" for r in reasons],
@@ -115,7 +119,12 @@ def reasons_chart(result) -> go.Figure:
     fig.update_layout(
         height=60 + 40 * len(reasons),
         margin={"l": 10, "r": 40, "t": 10, "b": 10},
-        xaxis={"title": "% giá/m² so với tin trung bình", "zeroline": True},
+        xaxis={
+            "title": "% giá/m² so với tin trung bình",
+            "zeroline": True,
+            # leave room for the value labels outside the bars
+            "range": [min(0, *effects) - pad, max(0, *effects) + pad],
+        },
     )
     return fig
 
