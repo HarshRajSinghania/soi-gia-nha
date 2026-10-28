@@ -10,6 +10,7 @@ COPY --chown=app pyproject.toml README.md ./
 COPY --chown=app src ./src
 RUN pip install --no-cache-dir ".[app]"
 COPY --chown=app app ./app
+COPY --chown=app .streamlit ./.streamlit
 
 USER app
 # Model files (~220 MB) are fetched from the GitHub release on first start.

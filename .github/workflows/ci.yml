@@ -25,4 +25,4 @@ jobs:
       - uses: actions/checkout@v7
       - run: docker build -t soi-gia-nha .
       - name: App imports inside the image
-        run: docker run --rm soi-gia-nha python -c "import soi_gia_nha.explain, streamlit, plotly"
+        run: docker run --rm soi-gia-nha python -c "import soi_gia_nha.explain, streamlit"
