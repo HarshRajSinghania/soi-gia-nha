@@ -6,7 +6,7 @@
 City and get a fair price range, a verdict, and the reasons behind it. Trained on 1.5 million
 real listings from June 2025 to March 2026.
 
-<p align="center"><img src="docs/demo.png" width="560" alt="Demo: a Cầu Giấy house listed at 9.5 billion VND is flagged as cheaper than the area, with location as the main reason"></p>
+<p align="center"><img src="docs/demo.png" width="860" alt="Demo: a Cầu Giấy house listed at 9.5 billion VND is flagged as cheaper than the area, with location as the main reason"></p>
 
 ## Why
 
