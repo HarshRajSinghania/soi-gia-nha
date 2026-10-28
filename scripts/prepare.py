@@ -1,4 +1,4 @@
-"""Clean the raw listings and attach the post-2025 administrative units.
+"""Clean the raw listings, read details out of the text, attach the post-2025 units.
 
 python scripts/prepare.py   # writes data/processed/listings.parquet
 """
@@ -8,6 +8,7 @@ import argparse
 from soi_gia_nha.admin import attach_new_units, build_map, save_map
 from soi_gia_nha.clean import DEFAULT_PROVINCES, clean
 from soi_gia_nha.data import COLUMNS, PROCESSED_DIR, load_raw
+from soi_gia_nha.text import extract, fill_missing, prepare_text
 
 
 def main() -> None:
@@ -20,6 +21,10 @@ def main() -> None:
 
     df = clean(raw, DEFAULT_PROVINCES)
     print(f"clean      {len(df):>10,}")
+
+    feats = extract(prepare_text(df["name"], df["description"]))
+    df = fill_missing(df, feats)
+    print(f"floors     {df['floor_count'].notna().mean():>10.1%} known after reading the text")
 
     admin_map = build_map(DEFAULT_PROVINCES)
     save_map(admin_map)
