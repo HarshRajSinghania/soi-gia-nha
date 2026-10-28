@@ -1,6 +1,6 @@
 [project]
 name = "soi-gia-nha"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "Is this listing overpriced? Price check for Vietnamese real estate listings, with explanations."
 readme = "README.md"
 license = { text = "MIT" }
