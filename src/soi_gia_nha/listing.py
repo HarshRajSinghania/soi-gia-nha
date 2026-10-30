@@ -89,8 +89,10 @@ def build(
     """One-row frame for ``PriceModel``. Values passed explicitly win over the text."""
     feats = extract(prepare_text(pd.Series([""]), pd.Series([text]))).iloc[0]
     dims = _parse_dimensions(text)
-    frontage = details.get("frontage_width") or feats["txt_frontage"]
-    if frontage is None and dims is not None:
+    frontage = details.get("frontage_width")
+    if pd.isna(frontage):
+        frontage = feats["txt_frontage"]
+    if pd.isna(frontage) and dims is not None:
         # Width from "A x B" is typically the frontage.
         frontage = dims[0]
     row = {
